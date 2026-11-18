@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TuProfe20 Transformación de fracción impropia a mixto y fracciones equivalentes</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- KaTeX para las fórmulas matemáticas -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap');
+        
+        body { margin: 0; padding: 0; overflow: hidden; width: 100vw; height: 100dvh; user-select: none; }
+        .font-fun { font-family: 'Nunito', sans-serif; }
+        
+        /* Animaciones del Fondo y UI */
+        @keyframes floatUp { 0% { transform: translateY(105vh) rotate(0deg); } 100% { transform: translateY(-105vh) rotate(360deg); } }
+        @keyframes slideInRight { 0% { opacity: 0; transform: translateX(20px); } 100% { opacity: 1; transform: translateX(0); } }
+        @keyframes fadeInScale { 0% { opacity: 0; transform: scale(0.8); } 100% { opacity: 1; transform: scale(1); } }
+        @keyframes jellyPop {
+            0% { transform: scale3d(.3, .3, .3); opacity: 0; }
+            40% { transform: scale3d(1.1, 1.1, 1.1); }
+            60% { transform: scale3d(.95, .95, .95); opacity: 1; }
+            100% { transform: scale3d(1, 1, 1); opacity: 1; }
+        }
+        @keyframes robotFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+        @keyframes robotJump { 0%, 100% { transform: translateY(0); } 30% { transform: translateY(-18px); } }
+        @keyframes robotTalkArmL { 0%, 100% { transform: rotate(45deg); } 50% { transform: rotate(100deg); } }
+        @keyframes robotTalkArmR { 0%, 100% { transform: rotate(-45deg); } 50% { transform: rotate(-100deg); } }
+        @keyframes confettiExplosion { 
+            0% { transform: translate(0, 0) scale(1) rotate(0deg); opacity: 1; } 
+            80% { opacity: 1; } 
+            100% { transform: translate(var(--tx), var(--ty)) scale(0) rotate(var(--rot)); opacity: 0; } 
+        }
+
+        /* Animaciones Específicas para la Conversión Impropia -> Mixto */
+        @keyframes moveDivisorDown { 100% { transform: translate(20px, 65px); } }
+        @keyframes moveRemainderUp { 100% { transform: translate(85px, -65px); } }
+        @keyframes scaleQuotient { 100% { transform: translate(-55px, -35px) scale(1.6); } }
+        @keyframes fadeOutAnim { 100% { opacity: 0; } }
+        @keyframes fadeInAnim { 0% { opacity: 0; } 100% { opacity: 1; } }
+        @keyframes fillAppear { 0% { opacity: 0; } 100% { opacity: 1; } }
+
+        .scrollbar-hide::-webkit-scrollbar { display: none !important; }
+        .scrollbar-hide { -ms-overflow-style: none !important; scrollbar-width: none !important; }
+
+        .animate-floatUp { animation: floatUp linear infinite; }
+        .animate-slideInRight { animation: slideInRight 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        .animate-jellyPop { animation: jellyPop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        .animate-robotFloat { animation: robotFloat 3s ease-in-out infinite; }
+        .animate-robotJump { animation: robotJump 1s cubic-bezier(0.28, 0.84, 0.42, 1) infinite; }
+        .animate-robotTalkArmL { animation: robotTalkArmL 0.6s ease-in-out infinite; }
+        .animate-robotTalkArmR { animation: robotTalkArmR 0.6s ease-in-out infinite 0.1s; }
+        .animate-confettiExplosion { animation: confettiExplosion 1.8s cubic-bezier(0.25, 1, 0.5, 1) forwards; }
+
+        /* Ajustes de KaTeX para hacerlos más grandes y sin cuadros */
+        .katex { font-weight: 900 !important; }
+        .katex-display { margin: 0 !important; padding: 0 !important; }
+        
+        .math-enunciado .katex { font-size: clamp(1.2rem, 2.5vw, 1.8rem) !important; color: #1e293b !important; text-shadow: none; }
+        .math-history .katex { font-size: clamp(1rem, 2vw, 1.5rem) !important; color: #94a3b8 !important; opacity: 0.7; }
+        
+        /* Estilo super llamativo para el paso actual */
+        .math-current .katex { 
+            font-size: clamp(2rem, 4vw, 3.5rem) !important; 
+            color: #ec4899 !important; /* Rosa brillante para primaria */
+            text-shadow: 0px 3px 6px rgba(236, 72, 153, 0.3); 
+        }
+        
+        .math-current.step-final .katex {
+            color: #8b5cf6 !important; /* Violeta vibrante para el resultado final */
+            text-shadow: 0px 3px 8px rgba(139, 92, 246, 0.4);
+        }
+
+        .math-container-single-line {
+            width: 100%;
+            display: flex;
+            justify-content: flex-start;
+            align-items: center;
+            padding: 0.5rem 0;
+            overflow: visible;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, memo, useCallback } = React;
+
+        const Icon = ({ paths, className = "", size = 24, fill = "none", strokeWidth = "2.5" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill={fill} stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" className={className} dangerouslySetInnerHTML={{__html: paths}} />
+        );
+
+        const VolumeX = (p) => <Icon {...p} paths='<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/>' />;
+        const Volume2 = (p) => <Icon {...p} paths='<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>' />;
+        const Rocket = (p) => <Icon {...p} paths='<path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/>' />;
+        const Sparkles = (p) => <Icon {...p} paths='<path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M3 5h4"/><path d="M19 3v4"/><path d="M17 5h4"/>' />;
+        const Home = (p) => <Icon {...p} paths='<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>' />;
+        const ChevronLeft = (p) => <Icon {...p} paths='<polyline points="15 18 9 12 15 6"/>' />;
+        const ChevronRight = (p) => <Icon {...p} paths='<polyline points="9 18 15 12 9 6"/>' />;
+
+        // Sistema de Sonido Robusto
+        const AudioController = {
+            ctx: null, muted: false, bgmNode: null,
+            init: function() {
+                try {
+                    if (this.ctx) return;
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    if (AudioContext) this.ctx = new AudioContext();
+                } catch (e) { console.warn("AudioContext no soportado."); }
+            },
+            startBGM: function() {
+                if (!this.ctx) return;
+                try {
+                    if (this.ctx.state === 'suspended') this.ctx.resume().catch(() => {});
+                    if (this.bgmNode) return;
+                    const mainGain = this.ctx.createGain();
+                    mainGain.gain.value = this.muted ? 0 : 0.05;
+                    const filter = this.ctx.createBiquadFilter();
+                    filter.type = 'lowpass'; filter.frequency.value = 600;
+                    filter.connect(mainGain); mainGain.connect(this.ctx.destination);
+                    this.bgmNode = { mainGain, filter, interval: null };
+                    const chords = [ [55, 60, 64], [52, 57, 64], [53, 57, 60], [50, 55, 59] ];
+                    let chordIndex = 0;
+                    const playChord = () => {
+                        if (this.ctx.state !== 'running') return;
+                        const chord = chords[chordIndex];
+                        chordIndex = (chordIndex + 1) % chords.length;
+                        chord.forEach((midi, i) => {
+                            const osc = this.ctx.createOscillator();
+                            const gain = this.ctx.createGain();
+                            osc.type = 'sine'; osc.frequency.value = 440 * Math.pow(2, (midi - 69) / 12);
+                            const now = this.ctx.currentTime; const delay = i * 0.3;
+                            gain.gain.setValueAtTime(0, now + delay);
+                            gain.gain.linearRampToValueAtTime(0.1, now + delay + 2);
+                            gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 7);
+                            osc.connect(gain); gain.connect(filter);
+                            osc.start(now + delay); osc.stop(now + delay + 7);
+                        });
+                    };
+                    playChord(); this.bgmNode.interval = setInterval(playChord, 7000);
+                } catch (e) { console.warn("BGM Error"); }
+            },
+            play: function(type) {
+                if (this.muted || !this.ctx) return;
+                try {
+                    if (this.ctx.state === 'suspended') this.ctx.resume();
+                    const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+                    osc.connect(gain); gain.connect(this.ctx.destination);
+                    const now = this.ctx.currentTime;
+                    if (type === 'pop') {
+                        osc.type = 'sine'; osc.frequency.setValueAtTime(600, now); osc.frequency.exponentialRampToValueAtTime(1000, now + 0.1);
+                        gain.gain.setValueAtTime(0.3, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                        osc.start(now); osc.stop(now + 0.1);
+                    } else if (type === 'pop-reverse') {
+                        osc.type = 'triangle'; osc.frequency.setValueAtTime(800, now); osc.frequency.exponentialRampToValueAtTime(300, now + 0.12);
+                        gain.gain.setValueAtTime(0.2, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
+                        osc.start(now); osc.stop(now + 0.12);
+                    } else if (type === 'success') {
+                        osc.disconnect(); const notes = [523.25, 659.25, 783.99, 1046.50];
+                        notes.forEach((freq, i) => {
+                            const o = this.ctx.createOscillator(); const g = this.ctx.createGain();
+                            o.type = 'triangle'; o.frequency.value = freq;
+                            o.connect(g); g.connect(this.ctx.destination);
+                            const startTime = now + (i * 0.08);
+                            g.gain.setValueAtTime(0, startTime); g.gain.linearRampToValueAtTime(0.2, startTime + 0.05); g.gain.linearRampToValueAtTime(0, startTime + 0.4);
+                            o.start(startTime); o.stop(startTime + 0.4);
+                        });
+                    }
+                } catch (e) {}
+            },
+            toggleMute: function() { 
+                this.muted = !this.muted; 
+                if (this.bgmNode) this.bgmNode.mainGain.gain.setTargetAtTime(this.muted ? 0 : 0.05, this.ctx.currentTime, 0.1);
+                return this.muted; 
+            }
+        };
+
+        const MathDisplay = memo(({ latex, className = "", inline = false }) => {
+            const containerRef = useRef(null);
+            useEffect(() => {
+                if (containerRef.current && window.katex) {
+                    try { window.katex.render(latex, containerRef.current, { displayMode: !inline, throwOnError: false, strict: false, trust: true }); }
+                    catch (e) { containerRef.current.innerText = latex; }
+                }
+            }, [latex, inline]);
+            return inline ? <span ref={containerRef} className={`inline-block align-middle ${className}`} /> : <div className={`math-container-single-line ${className}`}><div ref={containerRef} className="w-full text-left ml-4 md:ml-12" /></div>;
+        });
+
+        const BLOCKS_INFO = [
+            { id: 1, title: "Impropia a Mixto", theme: "from-blue-400 to-cyan-400", border: "border-blue-300", startIndex: 0 },
+            { id: 2, title: "Mixto a Impropia", theme: "from-purple-400 to-fuchsia-400", border: "border-fuchsia-300", startIndex: 5 },
+            { id: 3, title: "Equivalentes por Amplificación", theme: "from-rose-400 to-pink-400", border: "border-pink-300", startIndex: 10 },
+            { id: 4, title: "Equivalentes por Simplificación", theme: "from-amber-400 to-orange-400", border: "border-orange-300", startIndex: 15 }
+        ];
+
+        // 20 Ejercicios completamente desarrollados
+        const EXERCISES = [
+            // BLOQUE 1 (0-4): Impropia a Mixto
+            { title: "Reto 1", subtitle: "Impropia a Mixto",
+              enunciado: () => <span>Transforma <MathDisplay inline latex="\frac{15}{7}" /> a mixto.</span>,
+              steps: [
+                  { latex: String.raw`\frac{15}{7}`, propertyText: "Fracción Impropia", robotSpeech: "Esta es nuestra fracción original: 15 partes de 7.", graphic: { type: 'blocks', blocks: [{t:7,f:7}, {t:7,f:7}, {t:7,f:1}] } },
+                  { latex: String.raw`15 \div 7`, propertyText: "Dividir", robotSpeech: "Dividimos el numerador (15) entre el denominador (7).", graphic: { type: 'division', n: 15, d: 7, q: '?', r: '?' } },
+                  { latex: String.raw`15 = 7 \times 2 + 1`, propertyText: "Resolver", robotSpeech: "7 cabe 2 veces en 15, y nos sobra 1.", graphic: { type: 'division', n: 15, d: 7, q: 2, r: 1 } },
+                  { latex: String.raw`2 \frac{1}{7}`, propertyText: "Animación Mágica", robotSpeech: "¡Observa! El residuo 1 sube, el 7 baja, y el cociente 2 crece para ser el entero.", graphic: { type: 'division', animateMixed: true, n: 15, d: 7, q: 2, r: 1 } },
+                  { latex: String.raw`\frac{15}{7} = 2 \frac{1}{7}`, propertyText: "Resultado Final", robotSpeech: "¡Perfecto! La fracción 15/7 es igual a 2 enteros y 1 séptimo.", graphic: { type: 'blocks', blocks: [{t:7,f:7}, {t:7,f:7}, {t:7,f:1}] } }
+              ]
+            },
+            { title: "Reto 2", subtitle: "Impropia a Mixto",
+              enunciado: () => <span>Transforma <MathDisplay inline latex="\frac{13}{4}" /> a mixto.</span>,
+              steps: [
+                  { latex: String.raw`\frac{13}{4}`, propertyText: "Fracción Impropia", robotSpeech: "13 cuartos listos para agruparse.", graphic: { type: 'blocks', blocks: [{t:4,f:4}, {t:4,f:4}, {t:4,f:4}, {t:4,f:1}] } },
+                  { latex: String.raw`13 \div 4`, propertyText: "Dividir", robotSpeech: "Calculamos 13 dividido entre 4.", graphic: { type: 'division', n: 13, d: 4, q: '?', r: '?' } },
+                  { latex: String.raw`13 = 4 \times 3 + 1`, propertyText: "Resolver", robotSpeech: "El 4 entra 3 veces, sobrando 1.", graphic: { type: 'division', n: 13, d: 4, q: 3, r: 1 } },
+                  { latex: String.raw`3 \frac{1}{4}`, propertyText: "Animación Mágica", robotSpeech: "El divisor baja al denominador, el residuo sube al numerador.", graphic: { type: 'division', animateMixed: true, n: 13, d: 4, q: 3, r: 1 } },
+                  { latex: String.raw`\frac{13}{4} = 3 \frac{1}{4}`, propertyText: "Resultado Final", robotSpeech: "¡Muy bien! Son 3 enteros y 1 cuarto extra.", graphic: { type: 'blocks', blocks: [{t:4,f:4}, {t:4,f:4}, {t:4,f:4}, {t:4,f:1}] } }
+              ]
+            },
+            { title: "Reto 3", subtitle: "Impropia a Mixto",
+              enunciado: () => <span>Transforma <MathDisplay inline latex="\frac{22}{5}" /> a mixto.</span>,
+              steps: [
+                  { latex: String.raw`\frac{22}{5}`, propertyText: "Fracción Impropia", robotSpeech: "Veintidós quintos.", graphic: { type: 'blocks', blocks: [{t:5,f:5}, {t:5,f:5}, {t:5,f:5}, {t:5,f:5}, {t:5,f:2}] } },
+                  { latex: String.raw`22 \div 5`, propertyText: "Dividir", robotSpeech: "Dividimos 22 entre 5.", graphic: { type: 'division', n: 22, d: 5, q: '?', r: '?' } },
+                  { latex: String.raw`22 = 5 \times 4 + 2`, propertyText: "Resolver", robotSpeech: "5 por 4 es 20, para llegar a 22 sobran 2.", graphic: { type: 'division', n: 22, d: 5, q: 4, r: 2 } },
+                  { latex: String.raw`4 \frac{2}{5}`, propertyText: "Animación Mágica", robotSpeech: "Fíjate en el movimiento para formar la fracción mixta.", graphic: { type: 'division', animateMixed: true, n: 22, d: 5, q: 4, r: 2 } },
+                  { latex: String.raw`\frac{22}{5} = 4 \frac{2}{5}`, propertyText: "Resultado Final", robotSpeech: "Exactamente 4 enteros y 2 quintos.", graphic: { type: 'blocks', blocks: [{t:5,f:5}, {t:5,f:5}, {t:5,f:5}, {t:5,f:5}, {t:5,f:2}] } }
+              ]
+            },
+            { title: "Reto 4", subtitle: "Impropia a Mixto",
+              enunciado: () => <span>Transforma <MathDisplay inline latex="\frac{26}{8}" /> a mixto.</span>,
+              steps: [
+                  { latex: String.raw`\frac{26}{8}`, propertyText: "Fracción Impropia", robotSpeech: "Empezamos con 26 octavos.", graphic: { type: 'blocks', blocks: [{t:8,f:8}, {t:8,f:8}, {t:8,f:8}, {t:8,f:2}] } },
+                  { latex: String.raw`26 \div 8`, propertyText: "Dividir", robotSpeech: "Hallamos los enteros dividiendo.", graphic: { type: 'division', n: 26, d: 8, q: '?', r: '?' } },
+                  { latex: String.raw`26 = 8 \times 3 + 2`, propertyText: "Resolver", robotSpeech: "Cociente 3 y residuo 2.", graphic: { type: 'division', n: 26, d: 8, q: 3, r: 2 } },
+                  { latex: String.raw`3 \frac{2}{8}`, propertyText: "Animación Mágica", robotSpeech: "Formamos el mixto. Nota: aún se podría simplificar 2/8 a 1/4.", graphic: { type: 'division', animateMixed: true, n: 26, d: 8, q: 3, r: 2 } },
+                  { latex: String.raw`\frac{26}{8} = 3 \frac{2}{8}`, propertyText: "Resultado Final", robotSpeech: "¡Completado! 3 enteros y 2 octavos.", graphic: { type: 'blocks', blocks: [{t:8,f:8}, {t:8,f:8}, {t:8,f:8}, {t:8,f:2}] } }
+              ]
+            },
+            { title: "Reto 5", subtitle: "Impropia a Mixto",
+              enunciado: () => <span>Transforma <MathDisplay inline latex="\frac{33}{6}" /> a mixto.</span>,
+              steps: [
+                  { latex: String.raw`\frac{33}{6}`, propertyText: "Fracción Impropia", robotSpeech: "Último reto del bloque: 33 sextos.", graphic: { type: 'blocks', blocks: [{t:6,f:6}, {t:6,f:6}, {t:6,f:6}, {t:6,f:6}, {t:6,f:6}, {t:6,f:3}] } },
+                  { latex: String.raw`33 \div 6`, propertyText: "Dividir", robotSpeech: "Dividimos 33 entre 6.", graphic: { type: 'division', n: 33, d: 6, q: '?', r: '?' } },
+                  { latex: String.raw`33 = 6 \times 5 + 3`, propertyText: "Resolver", robotSpeech: "6 entra 5 veces en 33, sobrando 3.", graphic: { type: 'division', n: 33, d: 6, q: 5, r: 3 } },
+                  { latex: String.raw`5 \frac{3}{6}`, propertyText: "Animación Mágica", robotSpeech: "¡Transformación dinámica en proceso!", graphic: { type: 'division', animateMixed: true, n: 33, d: 6, q: 5, r: 3 } },
+                  { latex: String.raw`\frac{33}{6} = 5 \frac{3}{6}`, propertyText: "Resultado Final", robotSpeech: "5 enteros y 3 sextos. ¡Bloque 1 superado!", graphic: { type: 'blocks', blocks: [{t:6,f:6}, {t:6,f:6}, {t:6,f:6}, {t:6,f:6}, {t:6,f:6}, {t:6,f:3}] } }
+              ]
+            },
+
+            // BLOQUE 2 (5-9): Mixto a Impropia
+            { title: "Reto 6", subtitle: "Mixto a Impropia",
+              enunciado: () => <span>Transforma <MathDisplay inline latex="2 \frac{1}{3}" /> a impropia.</span>,
+              steps: [
+                  { latex: String.raw`2 \frac{1}{3}`, propertyText: "Número Mixto", robotSpeech: "2 enteros y un tercio.", graphic: { type: 'blocks', blocks: [{t:3,f:3},{t:3,f:3},{t:3,f:1}] } },
+                  { latex: String.raw`2 \times 3 = 6 \text{ tercios}`, propertyText: "Multiplicar", robotSpeech: "Multiplicamos los 2 enteros por 3. Son 6 tercios en total." },
+                  { latex: String.raw`6 + 1 = 7 \text{ tercios}`, propertyText: "Sumar", robotSpeech: "Sumamos el tercio que estaba suelto. Total 7." },
+                  { latex: String.raw`2 \frac{1}{3} = \frac{7}{3}`, propertyText: "Resultado Final", robotSpeech: "¡Siete tercios es el resultado completo!", graphic: { type: 'blocks', blocks: [{t:3,f:3},{t:3,f:3},{t:3,f:1}] } }
+              ]
+            },
+            { title: "Reto 7", subtitle: "Mixto a Impropia",
+              enunciado: () => <span>Transforma <MathDisplay inline latex="3 \frac{2}{5}" /> a impropia.</span>,
+              steps: [
+                  { latex: String.raw`3 \frac{2}{5}`, propertyText: "Número Mixto", robotSpeech: "Tenemos 3 enteros y 2 quintos.", graphic: { type: 'blocks', blocks: [{t:5,f:5},{t:5,f:5},{t:5,f:5},{t:5,f:2}] } },
+                  { latex: String.raw`3 \times 5 = 15 \text{ quintos}`, propertyText: "Multiplicar", robotSpeech: "3 enteros partidos en quintos nos dan 15 pedacitos." },
+                  { latex: String.raw`15 + 2 = 17 \text{ quintos}`, propertyText: "Sumar", robotSpeech: "Agregamos los 2 pedazos sueltos. Son 17." },
+                  { latex: String.raw`3 \frac{2}{5} = \frac{17}{5}`, propertyText: "Resultado Final", robotSpeech: "Mantenemos el denominador 5. ¡17/5!", graphic: { type: 'blocks', blocks: [{t:5,f:5},{t:5,f:5},{t:5,f:5},{t:5,f:2}] } }
+              ]
+            },
+            { title: "Reto 8", subtitle: "Mixto a Impropia",
+              enunciado: () => <span>Transforma <MathDisplay inline latex="4 \frac{3}{4}" /> a impropia.</span>,
+              steps: [
+                  { latex: String.raw`4 \frac{3}{4}`, propertyText: "Número Mixto", robotSpeech: "4 enteros y 3 cuartos.", graphic: { type: 'blocks', blocks: [{t:4,f:4},{t:4,f:4},{t:4,f:4},{t:4,f:4},{t:4,f:3}] } },
+                  { latex: String.raw`4 \times 4 = 16 \text{ cuartos}`, propertyText: "Multiplicar", robotSpeech: "4 por 4 es 16 cuartos." },
+                  { latex: String.raw`16 + 3 = 19 \text{ cuartos}`, propertyText: "Sumar", robotSpeech: "Más 3 cuartos es igual a 19." },
+                  { latex: String.raw`4 \frac{3}{4} = \frac{19}{4}`, propertyText: "Resultado Final", robotSpeech: "Nos da 19 cuartos. ¡Excelente!", graphic: { type: 'blocks', blocks: [{t:4,f:4},{t:4,f:4},{t:4,f:4},{t:4,f:4},{t:4,f:3}] } }
+              ]
+            },
+            { title: "Reto 9", subtitle: "Mixto a Impropia",
+              enunciado: () => <span>Transforma <MathDisplay inline latex="1 \frac{5}{8}" /> a impropia.</span>,
+              steps: [
+                  { latex: String.raw`1 \frac{5}{8}`, propertyText: "Número Mixto", robotSpeech: "Un entero y cinco octavos.", graphic: { type: 'blocks', blocks: [{t:8,f:8},{t:8,f:5}] } },
+                  { latex: String.raw`1 \times 8 = 8 \text{ octavos}`, propertyText: "Multiplicar", robotSpeech: "1 por 8 es 8 octavos." },
+                  { latex: String.raw`8 + 5 = 13 \text{ octavos}`, propertyText: "Sumar", robotSpeech: "Sumamos los 5 que sobraban." },
+                  { latex: String.raw`1 \frac{5}{8} = \frac{13}{8}`, propertyText: "Resultado Final", robotSpeech: "13 octavos. Muy fácil, ¿verdad?", graphic: { type: 'blocks', blocks: [{t:8,f:8},{t:8,f:5}] } }
+              ]
+            },
+            { title: "Reto 10", subtitle: "Mixto a Impropia",
+              enunciado: () => <span>Transforma <MathDisplay inline latex="6 \frac{1}{2}" /> a impropia.</span>,
+              steps: [
+                  { latex: String.raw`6 \frac{1}{2}`, propertyText: "Número Mixto", robotSpeech: "Seis enteros y medio.", graphic: { type: 'blocks', blocks: [{t:2,f:2},{t:2,f:2},{t:2,f:2},{t:2,f:2},{t:2,f:2},{t:2,f:2},{t:2,f:1}] } },
+                  { latex: String.raw`6 \times 2 = 12 \text{ medios}`, propertyText: "Multiplicar", robotSpeech: "Seis por dos son doce mitades." },
+                  { latex: String.raw`12 + 1 = 13 \text{ medios}`, propertyText: "Sumar", robotSpeech: "Doce más una mitad extra son trece." },
+                  { latex: String.raw`6 \frac{1}{2} = \frac{13}{2}`, propertyText: "Resultado Final", robotSpeech: "Trece medios. ¡Terminamos el bloque 2!", graphic: { type: 'blocks', blocks: [{t:2,f:2},{t:2,f:2},{t:2,f:2},{t:2,f:2},{t:2,f:2},{t:2,f:2},{t:2,f:1}] } }
+              ]
+            },
+
+            // BLOQUE 3 (10-14): Equivalentes por Amplificación
+            { title: "Reto 11", subtitle: "Amplificación",
+              enunciado: () => <span>Halla equivalente a <MathDisplay inline latex="\frac{1}{3}" /> amplificando por 2.</span>,
+              steps: [
+                  { latex: String.raw`\frac{1}{3}`, propertyText: "Inicio", robotSpeech: "Empezamos con 1 tercio.", graphic: { type: 'comparison', left: {blocks:[{t:3,f:1}], label: '1/3'}, right: {blocks:[{t:6,f:0}], label: '?/?'} } },
+                  { latex: String.raw`\frac{1 \times 2}{3 \times 2}`, propertyText: "Multiplicar", robotSpeech: "Cortamos cada pedazo a la mitad multiplicando por 2.", graphic: { type: 'operation', f1: {n:1,d:3}, f2: {n:2,d:6}, opTop: '× 2', opBot: '× 2' } },
+                  { latex: String.raw`\frac{1}{3} = \frac{2}{6}`, propertyText: "Equivalentes", robotSpeech: "Obtenemos 2 sextos. ¡Misma cantidad pintada!", graphic: { type: 'comparison', left: {blocks:[{t:3,f:1}], label: '1/3'}, right: {blocks:[{t:6,f:2}], label: '2/6'}, operator: '=' } }
+              ]
+            },
+            { title: "Reto 12", subtitle: "Amplificación",
+              enunciado: () => <span>Halla equivalente a <MathDisplay inline latex="\frac{3}{4}" /> amplificando por 3.</span>,
+              steps: [
+                  { latex: String.raw`\frac{3}{4}`, propertyText: "Inicio", robotSpeech: "Tres cuartos.", graphic: { type: 'comparison', left: {blocks:[{t:4,f:3}], label: '3/4'}, right: {blocks:[{t:12,f:0}], label: '?/?'} } },
+                  { latex: String.raw`\frac{3 \times 3}{4 \times 3}`, propertyText: "Multiplicar", robotSpeech: "Multiplicamos numerador y denominador por 3.", graphic: { type: 'operation', f1: {n:3,d:4}, f2: {n:9,d:12}, opTop: '× 3', opBot: '× 3' } },
+                  { latex: String.raw`\frac{3}{4} = \frac{9}{12}`, propertyText: "Equivalentes", robotSpeech: "Nueve doceavos. Equivalencia exacta.", graphic: { type: 'comparison', left: {blocks:[{t:4,f:3}], label: '3/4'}, right: {blocks:[{t:12,f:9}], label: '9/12'}, operator: '=' } }
+              ]
+            },
+            { title: "Reto 13", subtitle: "Amplificación",
+              enunciado: () => <span>Halla equivalente a <MathDisplay inline latex="\frac{2}{5}" /> amplificando por 4.</span>,
+              steps: [
+                  { latex: String.raw`\frac{2}{5}`, propertyText: "Inicio", robotSpeech: "Dos quintos.", graphic: { type: 'comparison', left: {blocks:[{t:5,f:2}], label: '2/5'}, right: {blocks:[{t:20,f:0}], label: '?/?'} } },
+                  { latex: String.raw`\frac{2 \times 4}{5 \times 4}`, propertyText: "Multiplicar", robotSpeech: "Amplificamos por 4.", graphic: { type: 'operation', f1: {n:2,d:5}, f2: {n:8,d:20}, opTop: '× 4', opBot: '× 4' } },
+                  { latex: String.raw`\frac{2}{5} = \frac{8}{20}`, propertyText: "Equivalentes", robotSpeech: "Se vuelve 8/20.", graphic: { type: 'comparison', left: {blocks:[{t:5,f:2}], label: '2/5'}, right: {blocks:[{t:20,f:8}], label: '8/20'}, operator: '=' } }
+              ]
+            },
+            { title: "Reto 14", subtitle: "Amplificación",
+              enunciado: () => <span>Halla equivalente a <MathDisplay inline latex="\frac{1}{2}" /> amplificando por 5.</span>,
+              steps: [
+                  { latex: String.raw`\frac{1}{2}`, propertyText: "Inicio", robotSpeech: "Un medio.", graphic: { type: 'comparison', left: {blocks:[{t:2,f:1}], label: '1/2'}, right: {blocks:[{t:10,f:0}], label: '?/?'} } },
+                  { latex: String.raw`\frac{1 \times 5}{2 \times 5}`, propertyText: "Multiplicar", robotSpeech: "Multiplicamos todo por 5.", graphic: { type: 'operation', f1: {n:1,d:2}, f2: {n:5,d:10}, opTop: '× 5', opBot: '× 5' } },
+                  { latex: String.raw`\frac{1}{2} = \frac{5}{10}`, propertyText: "Equivalentes", robotSpeech: "Cinco décimos (5/10) es la mitad también.", graphic: { type: 'comparison', left: {blocks:[{t:2,f:1}], label: '1/2'}, right: {blocks:[{t:10,f:5}], label: '5/10'}, operator: '=' } }
+              ]
+            },
+            { title: "Reto 15", subtitle: "Amplificación",
+              enunciado: () => <span>Halla equivalente a <MathDisplay inline latex="\frac{3}{7}" /> amplificando por 2.</span>,
+              steps: [
+                  { latex: String.raw`\frac{3}{7}`, propertyText: "Inicio", robotSpeech: "Tres séptimos.", graphic: { type: 'comparison', left: {blocks:[{t:7,f:3}], label: '3/7'}, right: {blocks:[{t:14,f:0}], label: '?/?'} } },
+                  { latex: String.raw`\frac{3 \times 2}{7 \times 2}`, propertyText: "Multiplicar", robotSpeech: "Duplicamos cada parte.", graphic: { type: 'operation', f1: {n:3,d:7}, f2: {n:6,d:14}, opTop: '× 2', opBot: '× 2' } },
+                  { latex: String.raw`\frac{3}{7} = \frac{6}{14}`, propertyText: "Equivalentes", robotSpeech: "6/14. ¡Terminamos amplificación!", graphic: { type: 'comparison', left: {blocks:[{t:7,f:3}], label: '3/7'}, right: {blocks:[{t:14,f:6}], label: '6/14'}, operator: '=' } }
+              ]
+            },
+
+            // BLOQUE 4 (15-19): Equivalentes por Simplificación
+            { title: "Reto 16", subtitle: "Simplificación",
+              enunciado: () => <span>Halla equivalente a <MathDisplay inline latex="\frac{6}{8}" /> simplificando por 2.</span>,
+              steps: [
+                  { latex: String.raw`\frac{6}{8}`, propertyText: "Inicio", robotSpeech: "Tenemos seis octavos. Queremos una fracción más simple.", graphic: { type: 'comparison', left: {blocks:[{t:8,f:6}], label: '6/8'}, right: {blocks:[{t:4,f:0}], label: '?/?'} } },
+                  { latex: String.raw`\frac{6 \div 2}{8 \div 2}`, propertyText: "Dividir", robotSpeech: "Dividimos entre 2 para fusionar piezas.", graphic: { type: 'operation', f1: {n:6,d:8}, f2: {n:3,d:4}, opTop: '÷ 2', opBot: '÷ 2', color: '#f59e0b' } },
+                  { latex: String.raw`\frac{6}{8} = \frac{3}{4}`, propertyText: "Equivalentes", robotSpeech: "Se simplifica a 3/4. ¡Exactamente igual!", graphic: { type: 'comparison', left: {blocks:[{t:8,f:6}], label: '6/8'}, right: {blocks:[{t:4,f:3}], label: '3/4'}, operator: '=' } }
+              ]
+            },
+            { title: "Reto 17", subtitle: "Simplificación",
+              enunciado: () => <span>Halla equivalente a <MathDisplay inline latex="\frac{9}{12}" /> simplificando por 3.</span>,
+              steps: [
+                  { latex: String.raw`\frac{9}{12}`, propertyText: "Inicio", robotSpeech: "Nueve doceavos.", graphic: { type: 'comparison', left: {blocks:[{t:12,f:9}], label: '9/12'}, right: {blocks:[{t:4,f:0}], label: '?/?'} } },
+                  { latex: String.raw`\frac{9 \div 3}{12 \div 3}`, propertyText: "Dividir", robotSpeech: "Sacamos tercia (dividimos por 3).", graphic: { type: 'operation', f1: {n:9,d:12}, f2: {n:3,d:4}, opTop: '÷ 3', opBot: '÷ 3', color: '#f59e0b' } },
+                  { latex: String.raw`\frac{9}{12} = \frac{3}{4}`, propertyText: "Equivalentes", robotSpeech: "Queda 3/4.", graphic: { type: 'comparison', left: {blocks:[{t:12,f:9}], label: '9/12'}, right: {blocks:[{t:4,f:3}], label: '3/4'}, operator: '=' } }
+              ]
+            },
+            { title: "Reto 18", subtitle: "Simplificación",
+              enunciado: () => <span>Halla equivalente a <MathDisplay inline latex="\frac{10}{15}" /> simplificando por 5.</span>,
+              steps: [
+                  { latex: String.raw`\frac{10}{15}`, propertyText: "Inicio", robotSpeech: "Diez quinceavos.", graphic: { type: 'comparison', left: {blocks:[{t:15,f:10}], label: '10/15'}, right: {blocks:[{t:3,f:0}], label: '?/?'} } },
+                  { latex: String.raw`\frac{10 \div 5}{15 \div 5}`, propertyText: "Dividir", robotSpeech: "Dividimos por 5.", graphic: { type: 'operation', f1: {n:10,d:15}, f2: {n:2,d:3}, opTop: '÷ 5', opBot: '÷ 5', color: '#f59e0b' } },
+                  { latex: String.raw`\frac{10}{15} = \frac{2}{3}`, propertyText: "Equivalentes", robotSpeech: "Nos queda 2/3.", graphic: { type: 'comparison', left: {blocks:[{t:15,f:10}], label: '10/15'}, right: {blocks:[{t:3,f:2}], label: '2/3'}, operator: '=' } }
+              ]
+            },
+            { title: "Reto 19", subtitle: "Simplificación",
+              enunciado: () => <span>Halla equivalente a <MathDisplay inline latex="\frac{14}{21}" /> simplificando por 7.</span>,
+              steps: [
+                  { latex: String.raw`\frac{14}{21}`, propertyText: "Inicio", robotSpeech: "Catorce veintiunavos.", graphic: { type: 'comparison', left: {blocks:[{t:21,f:14}], label: '14/21'}, right: {blocks:[{t:3,f:0}], label: '?/?'} } },
+                  { latex: String.raw`\frac{14 \div 7}{21 \div 7}`, propertyText: "Dividir", robotSpeech: "Le sacamos la séptima parte.", graphic: { type: 'operation', f1: {n:14,d:21}, f2: {n:2,d:3}, opTop: '÷ 7', opBot: '÷ 7', color: '#f59e0b' } },
+                  { latex: String.raw`\frac{14}{21} = \frac{2}{3}`, propertyText: "Equivalentes", robotSpeech: "Se reduce mágicamente a 2/3.", graphic: { type: 'comparison', left: {blocks:[{t:21,f:14}], label: '14/21'}, right: {blocks:[{t:3,f:2}], label: '2/3'}, operator: '=' } }
+              ]
+            },
+            { title: "Reto 20", subtitle: "Simplificación",
+              enunciado: () => <span>Halla equivalente a <MathDisplay inline latex="\frac{12}{18}" /> simplificando por 6.</span>,
+              steps: [
+                  { latex: String.raw`\frac{12}{18}`, propertyText: "Inicio", robotSpeech: "¡Último reto del juego! 12/18.", graphic: { type: 'comparison', left: {blocks:[{t:18,f:12}], label: '12/18'}, right: {blocks:[{t:3,f:0}], label: '?/?'} } },
+                  { latex: String.raw`\frac{12 \div 6}{18 \div 6}`, propertyText: "Dividir", robotSpeech: "Reducimos al máximo dividiendo entre 6.", graphic: { type: 'operation', f1: {n:12,d:18}, f2: {n:2,d:3}, opTop: '÷ 6', opBot: '÷ 6', color: '#f59e0b' } },
+                  { latex: String.raw`\frac{12}{18} = \frac{2}{3}`, propertyText: "Equivalentes", robotSpeech: "Queda 2/3. ¡Completaste todos los niveles! Felicidades 🚀", graphic: { type: 'comparison', left: {blocks:[{t:18,f:12}], label: '12/18'}, right: {blocks:[{t:3,f:2}], label: '2/3'}, operator: '=' } }
+              ]
+            }
+        ];
+
+        // --- Gráficos Dinámicos ---
+
+        const Block = ({ x, y, size, total, filled, delay }) => {
+            const sliceW = size / total;
+            return (
+                <g transform={`translate(${x}, ${y})`}>
+                    <rect width={size} height={size} fill="#f1f5f9" stroke="#cbd5e1" strokeWidth="3" rx="8" />
+                    {Array.from({length: total}).map((_, i) => (
+                        <g key={i}>
+                            {i < filled && <rect x={i * sliceW} y={0} width={sliceW} height={size} fill="#0ea5e9"
+                                style={{animation: `fillAppear 0.4s ease-out ${delay + i*0.1}s forwards`, opacity: 0}}
+                            />}
+                            {i > 0 && <line x1={i * sliceW} y1={0} x2={i * sliceW} y2={size} stroke="#cbd5e1" strokeWidth="2" strokeDasharray="3 3"/>}
+                        </g>
+                    ))}
+                    <rect width={size} height={size} fill="none" stroke="#475569" strokeWidth="4" rx="8" />
+                </g>
+            )
+        };
+
+        const BlocksGraphic = memo(({ config }) => {
+            const blockW = 75;
+            const gap = 12;
+            const totalBlocks = config.blocks.length;
+            const perRow = 4;
+            const rows = Math.ceil(totalBlocks / perRow);
+            const w = Math.min(totalBlocks, perRow) * (blockW + gap);
+            const h = rows * (blockW + gap);
+            
+            return (
+                <div className="w-full h-full flex flex-col items-center justify-center">
+                    <svg viewBox={`0 0 ${w + 20} ${h + 20}`} className="max-w-full max-h-[300px]" style={{overflow:'visible'}}>
+                        {config.blocks.map((b, i) => {
+                            const r = Math.floor(i / perRow);
+                            const c = i % perRow;
+                            return <Block key={`block-${i}`} x={10 + c*(blockW+gap)} y={10 + r*(blockW+gap)} size={blockW} total={b.t} filled={b.f} delay={i*0.15} />
+                        })}
+                    </svg>
+                </div>
+            );
+        });
+
+        // Gráfico Animado de División (El 3 sube, el 5 baja, el cociente crece)
+        const DivisionGraphic = memo(({ config }) => {
+            const isMixed = config.animateMixed;
+            return (
+                <div className="w-full h-full flex items-center justify-center">
+                    <svg viewBox="0 0 240 180" className="w-full h-full max-h-[350px]" style={{overflow:'visible'}}>
+                        
+                        {/* Dividendo y líneas que desaparecen */}
+                        <g style={{ animation: isMixed ? 'fadeOutAnim 1s ease-in-out forwards' : 'none' }}>
+                            <text x="70" y="80" fontSize="45" fontWeight="bold" textAnchor="middle" fill="#334155">{config.n}</text>
+                            <path d="M 100 40 L 100 90 L 165 90" fill="none" stroke="#64748b" strokeWidth="6" strokeLinecap="round" />
+                        </g>
+                        
+                        {/* Divisor (Baja a ser denominador) */}
+                        <g style={{ animation: isMixed ? 'moveDivisorDown 1.5s ease-in-out forwards' : 'none' }}>
+                            <text x="135" y="80" fontSize="45" fontWeight="bold" textAnchor="middle" fill="#10b981">{config.d}</text>
+                        </g>
+                        
+                        {config.q !== '?' && (
+                            <>
+                                {/* Cociente (Crece y va a la izquierda como parte entera) */}
+                                <g style={{ animation: isMixed ? 'scaleQuotient 1.5s ease-in-out forwards' : 'none' }}>
+                                    <text x="135" y="140" fontSize="45" fontWeight="bold" textAnchor="middle" fill="#3b82f6">{config.q}</text>
+                                </g>
+                                
+                                {/* Residuo (Sube a ser numerador) */}
+                                <g style={{ animation: isMixed ? 'moveRemainderUp 1.5s ease-in-out forwards' : 'none' }}>
+                                    <text x="70" y="140" fontSize="45" fontWeight="bold" textAnchor="middle" fill="#f59e0b">{config.r}</text>
+                                </g>
+                                
+                                <g style={{ animation: isMixed ? 'fadeOutAnim 1s ease-in-out forwards' : 'none' }}>
+                                    <path d="M 30 95 L 85 95" stroke="#64748b" strokeWidth="5" strokeLinecap="round" />
+                                    <text x="15" y="140" fontSize="40" fontWeight="bold" fill="#94a3b8">-</text>
+                                </g>
+                            </>
+                        )}
+
+                        {/* Línea de fracción que aparece */}
+                        {isMixed && (
+                            <path d="M 125 95 L 185 95" stroke="#1e293b" strokeWidth="6" strokeLinecap="round" opacity="0" style={{ animation: 'fadeInAnim 0.5s ease-in-out 1.2s forwards' }} />
+                        )}
+                    </svg>
+                </div>
+            );
+        });
+
+        const ComparisonGraphic = memo(({ config }) => {
+            const blockW = 75;
+            const gap = 12;
+            const totalWLeft = config.left.blocks.length * blockW + (config.left.blocks.length - 1) * gap;
+            const totalWRight = config.right.blocks.length * blockW + (config.right.blocks.length - 1) * gap;
+            const maxW = Math.max(totalWLeft, totalWRight);
+
+            return (
+                <div className="w-full h-full flex items-center justify-center">
+                    <svg viewBox={`0 0 ${maxW + 120} 240`} className="max-w-full max-h-[380px]" style={{overflow:'visible'}}>
+                        <text x="50" y="65" fontSize="32" fontWeight="bold" textAnchor="end" fill="#1e293b">{config.left.label}</text>
+                        <g transform={`translate(70, 10)`}>
+                            {config.left.blocks.map((b, i) => <Block key={i} x={i*(blockW+gap)} y={0} size={blockW} total={b.t} filled={b.f} delay={0.1} />)}
+                        </g>
+
+                        <text x="50" y="185" fontSize="32" fontWeight="bold" textAnchor="end" fill="#1e293b">{config.right.label}</text>
+                        <g transform={`translate(70, 130)`}>
+                            {config.right.blocks.map((b, i) => <Block key={i} x={i*(blockW+gap)} y={0} size={blockW} total={b.t} filled={b.f} delay={0.5} />)}
+                        </g>
+                        
+                        {config.operator && (
+                            <g style={{animation: 'fadeInScale 0.6s ease-out 1s forwards', opacity: 0}}>
+                                <circle cx={maxW/2 + 70} cy="115" r="35" fill="#fef08a" stroke="#eab308" strokeWidth="4" />
+                                <text x={maxW/2 + 70} y="129" fontSize="42" fontWeight="bold" textAnchor="middle" fill="#854d0e">{config.operator}</text>
+                            </g>
+                        )}
+                    </svg>
+                </div>
+            );
+        });
+
+        // Gráfico para Amplificación y Reducción con flechas (Operaciones Equivalentes)
+        const OperationGraphic = memo(({ config }) => {
+            const color = config.color || '#ec4899';
+            return (
+                <div className="w-full h-full flex items-center justify-center">
+                    <svg viewBox="0 0 350 200" className="w-full h-full max-h-[300px]" style={{overflow:'visible'}}>
+                        
+                        <g style={{animation: 'fadeInScale 0.5s ease-out forwards'}}>
+                            <text x="80" y="85" fontSize="50" fontWeight="bold" textAnchor="middle" fill="#1e293b">{config.f1.n}</text>
+                            <path d="M 40 100 L 120 100" stroke="#334155" strokeWidth="6" strokeLinecap="round"/>
+                            <text x="80" y="155" fontSize="50" fontWeight="bold" textAnchor="middle" fill="#1e293b">{config.f1.d}</text>
+                        </g>
+
+                        <text x="175" y="115" fontSize="40" fontWeight="bold" textAnchor="middle" fill="#64748b">=</text>
+
+                        <g style={{animation: 'fadeInScale 0.5s ease-out 0.8s forwards', opacity: 0}}>
+                            <text x="270" y="85" fontSize="50" fontWeight="bold" textAnchor="middle" fill="#0ea5e9">{config.f2.n}</text>
+                            <path d="M 230 100 L 310 100" stroke="#0ea5e9" strokeWidth="6" strokeLinecap="round"/>
+                            <text x="270" y="155" fontSize="50" fontWeight="bold" textAnchor="middle" fill="#0ea5e9">{config.f2.d}</text>
+                        </g>
+
+                        <g style={{animation: 'fadeInScale 0.6s ease-out 0.4s forwards', opacity: 0}}>
+                            <path d="M 100 45 Q 175 10 250 45" fill="none" stroke={color} strokeWidth="4" strokeDasharray="6 6" />
+                            <polygon points="250,45 235,35 245,55" fill={color} />
+                            <rect x="140" y="0" width="70" height="35" rx="10" fill="white" stroke={color} strokeWidth="3" />
+                            <text x="175" y="25" fontSize="22" fontWeight="bold" textAnchor="middle" fill={color}>{config.opTop}</text>
+                        </g>
+
+                        <g style={{animation: 'fadeInScale 0.6s ease-out 0.6s forwards', opacity: 0}}>
+                            <path d="M 100 155 Q 175 190 250 155" fill="none" stroke={color} strokeWidth="4" strokeDasharray="6 6" />
+                            <polygon points="250,155 235,165 245,145" fill={color} />
+                            <rect x="140" y="165" width="70" height="35" rx="10" fill="white" stroke={color} strokeWidth="3" />
+                            <text x="175" y="190" fontSize="22" fontWeight="bold" textAnchor="middle" fill={color}>{config.opBot}</text>
+                        </g>
+
+                    </svg>
+                </div>
+            );
+        });
+
+        const GraphicManager = memo(({ config }) => {
+            if (!config) return null;
+            if (config.type === 'division') return <DivisionGraphic config={config} />;
+            if (config.type === 'blocks') return <BlocksGraphic config={config} />;
+            if (config.type === 'comparison') return <ComparisonGraphic config={config} />;
+            if (config.type === 'operation') return <OperationGraphic config={config} />;
+            return null;
+        });
+
+        // --- Fondos y Elementos Decorativos ---
+
+        const FloatingBackground = memo(() => {
+            const symbols = ['½', '¾', '÷', '×', '=', '¼', '⅕', '+', '-'];
+            const elements = Array.from({ length: 25 }).map((_, i) => ({
+                id: i, symbol: symbols[Math.floor(Math.random() * symbols.length)], left: `${Math.random() * 100}%`,
+                animationDuration: `${12 + Math.random() * 15}s`, animationDelay: `-${Math.random() * 20}s`,
+                fontSize: `${1.5 + Math.random() * 3}rem`, opacity: 0.05 + Math.random() * 0.1
+            }));
+            return (
+                <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+                    {elements.map((el) => (
+                        <div key={el.id} className="absolute text-white font-black animate-floatUp select-none drop-shadow-lg" style={{ left: el.left, bottom: '-15%', fontSize: el.fontSize, opacity: el.opacity, animationDuration: el.animationDuration, animationDelay: el.animationDelay }}>
+                            {el.symbol}
+                        </div>
+                    ))}
+                </div>
+            );
+        });
+
+        const Confetti = memo(() => {
+            const colors = ['#fde047', '#60a5fa', '#f472b6', '#34d399', '#a78bfa', '#ff5722'];
+            const pieces = Array.from({ length: 150 }).map((_, i) => ({
+                id: i, left: `${50 + (Math.random() * 20 - 10)}%`, color: colors[Math.floor(Math.random() * colors.length)],
+                tx: `${(Math.random() - 0.5) * 1000}px`, ty: `${(Math.random() - 1) * 1000}px`, rot: `${Math.random() * 720}deg`, delay: `${Math.random() * 0.3}s`
+            }));
+            return (
+                <div className="absolute inset-0 pointer-events-none z-50 flex items-center justify-center overflow-hidden">
+                    {pieces.map((p) => (
+                        <div key={p.id} className="absolute w-5 h-5 sm:w-6 sm:h-6 rounded-full animate-confettiExplosion shadow-sm" style={{ backgroundColor: p.color, '--tx': p.tx, '--ty': p.ty, '--rot': p.rot, animationDelay: p.delay, left: p.left, top: '50%' }} />
+                    ))}
+                </div>
+            );
+        });
+
+        const RobotAssistant = ({ step, maxSteps }) => {
+            const isFinalStep = step >= maxSteps;
+            const getContainerAnim = () => isFinalStep ? 'animate-robotJump' : 'animate-robotFloat';
+            const getArmLAnim = () => isFinalStep ? 'rotate-[150deg] animate-pulse' : (step > 0 ? 'animate-robotTalkArmL' : 'rotate-45');
+            const getArmRAnim = () => isFinalStep ? '-rotate-[150deg] animate-pulse' : (step > 0 ? 'animate-robotTalkArmR' : '-rotate-45');
+            
+            const getEyes = () => {
+                if (isFinalStep) return <div className="w-full flex justify-between px-1"><div className="w-3 h-2 bg-emerald-400 rounded-t-full mt-1"></div><div className="w-3 h-2 bg-emerald-400 rounded-t-full mt-1"></div></div>;
+                if (step === 0) return <div className="w-full flex justify-between px-1.5"><div className="w-2.5 h-2.5 bg-cyan-400 rounded-full animate-pulse"></div><div className="w-2.5 h-2.5 bg-cyan-400 rounded-full animate-pulse"></div></div>;
+                return <div className="w-full flex justify-between px-1"><div className="w-3 h-3 bg-yellow-400 rounded-full animate-bounce"></div><div className="w-3 h-3 bg-yellow-400 rounded-full animate-bounce"></div></div>;
+            };
+            const getMouth = () => {
+                if (isFinalStep) return <div className="w-5 h-3 bg-rose-400 rounded-b-full mt-1.5"></div>;
+                if (step === 0) return <div className="w-3.5 h-1.5 bg-cyan-300 rounded-full mt-1.5"></div>;
+                return <div className="w-3 h-3 bg-rose-400 rounded-full mt-1.5 animate-ping"></div>;
+            };
+
+            return (
+                <div className={`relative flex flex-col items-center drop-shadow-2xl select-none ${getContainerAnim()}`}>
+                    <div className="relative z-0 flex flex-col items-center translate-y-1">
+                        <div className={`w-3 h-3 rounded-full shadow-[0_0_15px_currentColor] z-10 transition-colors duration-300 ${isFinalStep ? 'text-emerald-400 bg-emerald-400' : 'text-yellow-400 bg-yellow-400 animate-pulse'}`}></div>
+                        <div className="w-2 h-4 bg-slate-300"></div>
+                    </div>
+                    <div className="relative z-10 w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-white to-slate-200 rounded-2xl border-[3px] border-indigo-400 shadow-2xl flex flex-col items-center justify-center p-1.5">
+                        <div className="w-full h-full bg-slate-900 rounded-xl flex flex-col items-center justify-center p-1.5 shadow-inner border-2 border-indigo-500">
+                            {getEyes()} {getMouth()}
+                        </div>
+                    </div>
+                    <div className={`absolute top-1/2 -left-2 w-3 h-5 bg-slate-200 border-[2px] border-indigo-400 rounded-full z-0 origin-top ${getArmLAnim()}`}></div>
+                    <div className={`absolute top-1/2 -right-2 w-3 h-5 bg-slate-200 border-[2px] border-indigo-400 rounded-full z-0 origin-top ${getArmRAnim()}`}></div>
+                </div>
+            );
+        };
+
+        // --- Aplicación Principal ---
+        function App() {
+            const [view, setView] = useState('home');
+            const [exIdx, setExIdx] = useState(0);
+            const [step, setStep] = useState(0);
+            const [isMuted, setIsMuted] = useState(false);
+            const scrollContainerRef = useRef(null);
+
+            const curEx = EXERCISES[exIdx];
+            const maxSteps = curEx.steps.length - 1;
+            const curStepData = curEx.steps[step];
+            const EnunciadoText = curEx.enunciado;
+
+            const handleInteraction = () => { AudioController.init(); AudioController.startBGM(); };
+
+            const startBlock = (index) => {
+                handleInteraction(); AudioController.play('swoosh');
+                setExIdx(index); setStep(0); setView('lab');
+            };
+
+            const nextStep = () => {
+                handleInteraction();
+                if (step < maxSteps) {
+                    setStep(step + 1); AudioController.play(step + 1 === maxSteps ? 'success' : 'pop');
+                } else {
+                    AudioController.play('swoosh');
+                    if (exIdx < EXERCISES.length - 1) { setExIdx(exIdx + 1); setStep(0); } 
+                    else { setView('home'); }
+                }
+            };
+
+            const prevStep = () => {
+                handleInteraction();
+                if (step > 0) { setStep(step - 1); AudioController.play('pop-reverse'); }
+            };
+
+            const toggleMute = () => { handleInteraction(); setIsMuted(AudioController.toggleMute()); };
+
+            useEffect(() => {
+                if(scrollContainerRef.current) scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+            }, [step, exIdx, view]);
+
+            const getCurrentGraphic = () => {
+                for (let i = step; i >= 0; i--) { if (curEx.steps[i].graphic) return curEx.steps[i].graphic; }
+                return null;
+            };
+
+            if (view === 'home') {
+                return (
+                    <div className="w-screen min-h-[100dvh] bg-gradient-to-br from-cyan-200 via-blue-300 to-purple-300 flex flex-col items-center justify-start p-4 sm:p-6 relative font-fun overflow-y-auto scrollbar-hide">
+                        <FloatingBackground />
+                        
+                        <div className="w-full max-w-6xl z-20 flex items-center justify-between mb-8 sm:mb-10 mt-2">
+                            <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl border-[3px] border-white/60 bg-white/40 backdrop-blur-md text-blue-800 font-black tracking-widest uppercase shadow-[0_4px_15px_rgba(0,0,0,0.1)] text-sm sm:text-base">
+                                <Rocket className="w-6 h-6 text-blue-600" /> TuProfe20
+                            </div>
+                            <button onClick={toggleMute} className="p-3 rounded-2xl bg-white/40 border-[3px] border-white/60 backdrop-blur-md text-blue-800 hover:bg-white/60 transition-all active:scale-95 shadow-lg">
+                                {isMuted ? <VolumeX className="w-6 h-6" /> : <Volume2 className="w-6 h-6" />}
+                            </button>
+                        </div>
+
+                        <div className="relative z-10 text-center w-full max-w-6xl flex flex-col items-center">
+                            <h1 className="text-4xl sm:text-6xl md:text-7xl lg:text-7xl font-black text-slate-800 mb-4 sm:mb-6 drop-shadow-[0_4px_0_rgba(255,255,255,0.6)] tracking-tighter leading-[1.1] uppercase">
+                                Transformación de <br className="hidden md:block"/>
+                                <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-rose-500">Fracciones </span>
+                                & <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-violet-600">Equivalencias</span>
+                            </h1>
+                            <p className="text-lg sm:text-xl lg:text-2xl text-slate-700 mb-10 sm:mb-16 font-bold max-w-4xl leading-relaxed bg-white/40 px-6 py-2 rounded-full shadow-sm backdrop-blur-sm">
+                                4 Bloques • 20 Retos • Gráficos Animados ¡Aprende jugando! 🎮🎨
+                            </p>
+
+                            <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-10 mb-12 px-2">
+                                {BLOCKS_INFO.map((block) => (
+                                    <button key={block.id} onClick={() => startBlock(block.startIndex)} className={`group text-left p-6 sm:p-8 rounded-[2rem] bg-gradient-to-br ${block.theme} bg-opacity-95 backdrop-blur-xl border-[4px] border-white/60 hover:-translate-y-3 hover:shadow-[0_25px_40px_rgba(0,0,0,0.2)] transition-all duration-300 flex flex-col relative overflow-hidden shadow-xl min-h-[14rem]`}>
+                                        <div className="absolute inset-0 bg-white/5 group-hover:bg-transparent transition-all"></div>
+                                        <div className="relative z-10 flex flex-col h-full justify-between">
+                                            <div className="flex items-start justify-between mb-4">
+                                                <span className={`text-slate-800 text-sm sm:text-base font-black px-4 py-1.5 rounded-xl border-2 border-white/50 bg-white/60 shadow-sm uppercase tracking-widest`}>Bloque {block.id}</span>
+                                                <span className="w-10 h-10 rounded-full bg-white/40 flex items-center justify-center border-2 border-white/60 backdrop-blur-sm group-hover:scale-110 transition-transform">
+                                                    <ChevronRight className="text-slate-800 w-6 h-6 stroke-[4px]" />
+                                                </span>
+                                            </div>
+                                            <h2 className="text-white text-3xl sm:text-4xl font-black drop-shadow-[0_2px_4px_rgba(0,0,0,0.3)] leading-tight">{block.title}</h2>
+                                            <p className="text-white/90 font-bold mt-2 text-lg drop-shadow-sm">5 Retos desbloqueados</p>
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="w-screen h-[100dvh] bg-gradient-to-br from-cyan-100 via-blue-100 to-purple-100 text-slate-800 flex flex-col p-2 sm:p-4 relative font-fun overflow-hidden">
+                    <FloatingBackground />
+                    {step === maxSteps && <Confetti />}
+
+                    <div className="shrink-0 relative z-10 w-full max-w-7xl mx-auto flex justify-between items-center mb-3 sm:mb-4 px-1">
+                        <button onClick={() => { AudioController.play('swoosh'); setView('home'); }} className="flex items-center justify-center px-4 py-2 sm:px-6 sm:py-3 rounded-[1rem] sm:rounded-2xl bg-white/60 border-[3px] border-white/80 backdrop-blur-md text-slate-700 font-black hover:bg-white/80 transition-all shadow-md active:scale-95 text-sm sm:text-base hover:scale-105">
+                            <Home className="w-5 h-5 sm:mr-2" />
+                            <span className="hidden sm:inline">Portada</span>
+                        </button>
+
+                        <div className="flex items-center gap-2 bg-white/40 p-2 sm:p-3 rounded-2xl border-2 border-white/60 backdrop-blur-md shadow-md overflow-x-auto scrollbar-hide max-w-[50vw]">
+                            {EXERCISES.map((ex, i) => (
+                                <button key={i} onClick={() => { handleInteraction(); setExIdx(i); setStep(0); }} className={`shrink-0 w-8 h-8 sm:w-12 sm:h-12 rounded-xl font-black text-sm sm:text-lg transition-all ${exIdx === i ? 'bg-cyan-500 text-white scale-110 shadow-[0_4px_10px_rgba(6,182,212,0.4)] border-2 border-white' : 'text-slate-600 hover:bg-white/60 border border-transparent'}`}>
+                                    {i + 1}
+                                </button>
+                            ))}
+                        </div>
+
+                        <button onClick={toggleMute} className="p-2 sm:p-3 rounded-2xl bg-white/60 border-[3px] border-white/80 text-slate-700 hover:bg-white/80 transition-all shadow-md active:scale-95 hover:scale-105">
+                            {isMuted ? <VolumeX className="w-6 h-6" /> : <Volume2 className="w-6 h-6" />}
+                        </button>
+                    </div>
+
+                    <div className="flex-1 min-h-0 relative z-10 w-full max-w-7xl mx-auto bg-white/95 backdrop-blur-xl rounded-[2rem] sm:rounded-[3rem] border-[4px] sm:border-[6px] border-white shadow-[0_15px_40px_rgba(0,0,0,0.1)] flex flex-col overflow-hidden">
+                        
+                        <div className="shrink-0 bg-blue-50 border-b-[4px] border-blue-100 px-4 py-4 sm:px-8 flex flex-col justify-center relative shadow-sm z-20">
+                            <div className="flex justify-between items-center w-full mb-3">
+                                <span className="bg-cyan-400 text-white font-black text-sm sm:text-base px-4 py-1.5 rounded-xl uppercase tracking-widest shadow-sm border-2 border-cyan-200">{curEx.title}</span>
+                                <span className="text-orange-500 font-bold text-sm sm:text-base bg-orange-100 px-4 py-1.5 rounded-xl border border-orange-200">{curEx.subtitle}</span>
+                            </div>
+                            <div className="flex flex-col items-center justify-center text-slate-800 font-bold text-xl sm:text-2xl md:text-3xl text-center w-full leading-relaxed math-enunciado">
+                                <EnunciadoText />
+                            </div>
+                        </div>
+
+                        <div className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
+                            
+                            {/* ZONA DE DESARROLLO - TEXTO GIGANTE, SIN CUADROS */}
+                            <div ref={scrollContainerRef} className="w-full md:w-1/2 flex-1 p-4 sm:p-8 overflow-y-auto scrollbar-hide flex flex-col justify-start pb-24 relative z-10 border-r-4 border-slate-100/50">
+                                <div className="absolute inset-0 opacity-[0.03] bg-[radial-gradient(#0f172a_2px,transparent_2px)] [background-size:20px_20px] pointer-events-none"></div>
+                                
+                                {curEx.steps.slice(0, step + 1).map((s, idx) => (
+                                    <div key={`${exIdx}-${idx}`} className={`w-full flex flex-col mb-10 sm:mb-12 transition-all duration-500 ${idx === step ? 'opacity-100 scale-100 animate-slideInRight' : 'opacity-50 scale-[0.97] blur-[0.5px]'}`}>
+                                        <div className="mb-3 shrink-0 animate-jellyPop z-20 self-start">
+                                            <span className={`inline-flex items-center gap-2 px-5 py-2 rounded-xl font-black text-sm sm:text-base shadow-sm border-[2px] ${idx === step ? 'bg-gradient-to-r from-amber-300 to-orange-400 text-white border-amber-200' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
+                                                {idx === step && <Sparkles className="w-5 h-5 text-yellow-100" />} 
+                                                <span>{s.propertyText}</span>
+                                            </span>
+                                        </div>
+                                        
+                                        <div className={`w-full min-h-[6rem] ${idx === step ? (step === maxSteps ? 'math-current step-final' : 'math-current') : 'math-history'}`}>
+                                            <MathDisplay latex={s.latex} />
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* ZONA GRÁFICA GIGANTE */}
+                            <div className="w-full md:w-1/2 bg-slate-50/50 p-4 sm:p-8 flex flex-col items-center justify-center relative z-10">
+                                <div className="w-full h-full max-h-[80%] bg-white border-[4px] border-dashed border-cyan-300 rounded-[2rem] p-4 flex items-center justify-center shadow-lg relative overflow-visible">
+                                    <GraphicManager key={`${exIdx}-${step}`} config={getCurrentGraphic()} />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="shrink-0 bg-white w-full px-4 py-3 sm:px-8 sm:py-4 flex items-center gap-4 sm:gap-8 border-t-[4px] border-slate-100 z-30 relative shadow-[0_-5px_15px_rgba(0,0,0,0.03)]">
+                            <div className="shrink-0 absolute -top-12 sm:relative sm:-top-0 left-4 sm:left-0 drop-shadow-xl z-50">
+                                <RobotAssistant step={step} maxSteps={maxSteps} />
+                            </div>
+                            <div className="flex-1 text-sm sm:text-lg md:text-xl font-bold text-slate-700 leading-snug sm:leading-relaxed bg-blue-50 p-3 sm:p-5 rounded-2xl border-2 border-blue-100 min-h-[4rem] flex items-center shadow-inner ml-[4rem] sm:ml-0">
+                                <div key={`speech-${exIdx}-${step}`} className="animate-slideInRight w-full">
+                                    {curStepData.robotSpeech}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="shrink-0 bg-slate-100 p-3 sm:p-4 w-full flex flex-col items-center border-t-[4px] border-white z-40">
+                            <div className="flex justify-center items-stretch w-full max-w-4xl gap-3 sm:gap-6 h-12 sm:h-16">
+                                <button onClick={prevStep} disabled={step === 0} className="flex-[0.8] bg-slate-300 border-b-[6px] border-slate-400 text-slate-700 rounded-l-2xl font-black text-sm sm:text-lg flex items-center justify-center gap-2 active:border-b-0 active:translate-y-[6px] disabled:opacity-40 transition-all hover:bg-slate-400 hover:text-white">
+                                    <ChevronLeft className="w-6 h-6 stroke-[4px]" />
+                                    <span className="hidden sm:inline">Atrás</span>
+                                </button>
+                                <div className="bg-cyan-500 text-white font-black px-4 sm:px-6 text-sm sm:text-lg flex items-center justify-center border-b-[6px] border-cyan-600 shadow-inner whitespace-nowrap min-w-[4rem]">
+                                    Paso {step + 1} / {maxSteps + 1}
+                                </div>
+                                <button onClick={nextStep} className={`flex-[2] border-b-[6px] text-white rounded-r-2xl font-black text-sm sm:text-xl flex items-center justify-center gap-2 active:border-b-0 active:translate-y-[6px] transition-all shadow-md hover:brightness-110 ${
+                                    step === maxSteps ? 'bg-gradient-to-r from-fuchsia-400 to-purple-500 border-purple-600 animate-pulse' : 'bg-gradient-to-r from-cyan-400 to-blue-500 border-blue-600'
+                                }`}>
+                                    <span>{step < maxSteps ? '¡Siguiente Paso!' : exIdx < EXERCISES.length - 1 ? `Siguiente Reto` : '¡Volver al Menú!'}</span>
+                                    <ChevronRight className="w-6 h-6 stroke-[4px]" />
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
